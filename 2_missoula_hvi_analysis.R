@@ -200,6 +200,10 @@ df_final <- df_final %>%
 # rename variables so I don't have to do it manually in ArcGIS
 new_names <- c(
   "GEOID" = "geo_id",
+  "Total Population" = "total_pop",
+  "Area (sqmi)" = "area_sq_miles",
+  "Mean Canopy Percentage" = "canopy_perc_mean",
+  "Mean Imperviousness Percentage" = "imperviousness_perc_mean",
   "S - Original - Percent Aged Above 65" = "perc_over_65",
   "S - Ranked - Percent Aged Above 65" = "perc_over_65_ranked",
   "S - Original - Percent Aged Below 5" = "perc_under_5",
