@@ -150,7 +150,7 @@ data <- get_acs(
   geography = "tract",
   variables = query_vars, 
   state = "MT",
-  county = "063", # county FIPS code
+  #county = "063", # county FIPS code
   survey = "acs5",
   year = 2022
 )
@@ -253,8 +253,9 @@ df_census <- data_wide %>%
 # grab the tract areas in sqmi
 options(tigris_use_cache = TRUE)
 state_fips <- "30"  # Montana
-county_fips <- "063"  # Missoula County
-tracts <- tracts(state = state_fips, county = county_fips, year = 2022, class = "sf")
+#county_fips <- "063"  # Missoula County
+# county = county_fips
+tracts <- tracts(state = state_fips, year = 2022, class = "sf")
 # Project to EPSG:5070 (NAD83 / Conus Albers) which uses meters
 # then convert from square meters to square miles
 tracts_proj <- st_transform(tracts, 5070) %>%
@@ -298,7 +299,7 @@ mt_diabetes_mortality <- get_places(geography = "census",
 
 # filter to just what's needed
 df_mslacounty <- mt_diabetes_mortality %>% 
-  filter(countyname=="Missoula") %>% 
+  #filter(countyname=="Missoula") %>% 
   select(locationname, measureid, data_value) %>% 
   rename(geo_id = locationname)
 
@@ -317,6 +318,8 @@ write.csv(df_mslacounty, "data/cdc_places_data.csv", row.names = FALSE)
 # ************************************
 ###### EJScreen O3 (ozone) and PM2.5 state percentiles data ###### 
 # 
+# 
+# NEED TO CREATE A STATEWIDE MAPPING OF THE OLD CENSUS TRACTS -> NEW
 mapping_data <- data.frame(
   `geo_id` = c('30063000100', '30063000201', '30063000201', '30063000202', '30063000202',
                '30063000300', '30063000400', '30063000500', '30063000500', '30063000700',

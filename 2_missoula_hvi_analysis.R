@@ -18,6 +18,54 @@ df_arcgis_data <- df_arcgis_data %>%
   select(-XCoord, -YCoord) %>% 
   rename(geo_id = FIPS)
 
+df_python_data <- read.csv(here("outputs", "df_raster_analysis_final.csv"))
+df_python_data <- df_python_data %>% 
+  select(-area_sq_miles)
+
+# testing the R approach versus the Python
+merged_data <- df_arcgis_data %>%
+  left_join(df_python_data, by = "geo_id")
+long_data <- merged_data %>%
+  select(geo_id, surface_temp_mean, mean_temp_f) %>%
+  pivot_longer(cols = c(surface_temp_mean, mean_temp_f), names_to = "source", values_to = "temperature")
+ggplot(long_data, aes(x = temperature, fill = source)) +
+  geom_histogram(alpha = 0.5, bins = 20, position = "identity") +
+  scale_fill_manual(values = c("surface_temp_mean" = "blue", "mean_temp_f" = "red"),
+                    labels = c("Surface Temp (ArcGIS Data)", "Mean Temp (Python Data)")) +
+  labs(title = "Histogram of Surface Temperature Means",
+       x = "Temperature (F)",
+       y = "Frequency",
+       fill = "Data Source") +
+  theme_minimal()
+
+long_data_canopy <- merged_data %>%
+  select(geo_id, canopy_perc_mean, mean_perc_canopy) %>%
+  pivot_longer(cols = c(canopy_perc_mean, mean_perc_canopy), names_to = "source", values_to = "canopy_percentage")
+ggplot(long_data_canopy, aes(x = canopy_percentage, fill = source)) +
+  geom_histogram(alpha = 0.5, bins = 20, position = "identity") +
+  scale_fill_manual(values = c("canopy_perc_mean" = "blue", "mean_perc_canopy" = "red"),
+                    labels = c("Canopy Percentage (ArcGIS Data)", "Mean Canopy Percentage (Python Data)")) +
+  labs(title = "Histogram of Canopy Percentage Means",
+       x = "Canopy Percentage",
+       y = "Frequency",
+       fill = "Data Source") +
+  theme_minimal()
+
+long_data_impervious <- merged_data %>%
+  select(geo_id, imperviousness_perc_mean, mean_perc_impervious) %>%
+  pivot_longer(cols = c(imperviousness_perc_mean, mean_perc_impervious), names_to = "source", values_to = "impervious_percentage")
+ggplot(long_data_impervious, aes(x = impervious_percentage, fill = source)) +
+  geom_histogram(alpha = 0.5, bins = 20, position = "identity") +
+  scale_fill_manual(values = c("imperviousness_perc_mean" = "blue", "mean_perc_impervious" = "red"),
+                    labels = c("Imperviousness Percentage (ArcGIS Data)", "Mean Imperviousness Percentage (Python Data)")) +
+  labs(title = "Histogram of Imperviousness Percentage Means",
+       x = "Imperviousness Percentage",
+       y = "Frequency",
+       fill = "Data Source") +
+  theme_minimal()
+
+
+
 # mapping the pre-2020 tracts to the current tract boundaries.
 # This mapping was created by manually inspecting the old v new tract boundaries in ArcGIS
 # There were 9 new tracts created in Msla County for the 2020 decennial census. They were all created by
@@ -76,12 +124,17 @@ df_full <- df_full %>%
     o3_statepercentile = as.numeric(as.character(o3_statepercentile))
   )
 
+# This is the R code approach that we're going to replace with the python-derived data
+# df_full <- df_full %>% 
+#   left_join(df_arcgis_data, by = "geo_id")
+
 df_full <- df_full %>% 
   left_join(df_arcgis_data, by = "geo_id")
 
 # create the impervious-to-canopy ratio variable
 # The index was multiplied by -1 so that higher values correspond to more impervious coverage area and
 # therefore a greater risk of an urban heat island. 
+# This was the previous R packages approach; replacing it now with the index derived in python from that approach.
 df_full <- df_full %>%
   mutate(impervious_canopy_index = 
            -1 * ((canopy_perc_mean * area_sq_miles) - (imperviousness_perc_mean * area_sq_miles)) /
