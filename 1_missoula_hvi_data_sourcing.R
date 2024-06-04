@@ -17,6 +17,8 @@ options(scipen = 999)
 
 
 tictoc::tic()
+# key to "map" the data associated with pre-2020 tract boundaries to the current post-2020 boundaries
+tract_mapping_df_key <- read.csv(here("data", "mttracts_geo_id_mapping_2020_2024.csv"))
 
 # ************************************
 # ************************************
@@ -278,16 +280,42 @@ write.csv(df_census, "data/census_data.csv", row.names = FALSE)
 # vars available
 dict <- get_dictionary()
 
-# Query diabetes, asthma, coronary heart disease data for Montana at the census tract level
-mt_diabetes_mortality <- get_places(geography = "census",
+# Query diabetes, asthma, coronary heart disease data for Montana at the census tract level from CDC PLACES
+df_cdcplaces_mt <- get_places(geography = "census",
                                     state = "MT",
                                     measure = c("DIABETES", "CASTHMA", "CHD"))
+
+df_cdcplaces_mt <- df_cdcplaces_mt %>% 
+  select(locationname, measureid, data_value) %>% 
+  rename(geo_id = locationname)
+
+temp_var <- df_cdcplaces_mt %>% 
+  filter(measureid=="DIABETES")
+
+# checking overlap of old v new tracts
+# a <- df_cdcplaces_mt %>% 
+#   filter(locationname %in% c("30031000501", "30031000102"))
+# old_tracts <- df_cdcplaces_mt %>% 
+#   filter(measureid=="DIABETES") %>% 
+#   select(locationname) %>% 
+#   rename(geo_id = locationname) %>% 
+#   mutate(geo_id = as.numeric(geo_id))
+# write.csv(test, "data/pre2020_tractids.csv", row.names = FALSE)
+# 
+# 
+# new_tracts <- df_census %>% 
+#   select(geo_id)
+# 
+# new_only_changed <- new_tracts %>% 
+#   anti_join(old_tracts, by = "geo_id")
+# write.csv(new_only_changed, "data/2024onlychanged_tractids.csv", row.names = FALSE)
+
 
 # QA plots if needed
 # measure_id <- "DIABETES" # diabetes
 # measure_id <- "CASTHMA" # asthma
 # measure_id <- "CHD" # coronary heart disease
-# mt_diabetes_mortality %>%
+# df_cdcplaces_mt %>%
 #   filter(measureid == measure_id & countyname == "Missoula") %>%
 #   ggplot(aes(data_value, reorder(locationname, data_value))) +
 #   geom_point(size = 2) +
@@ -298,20 +326,18 @@ mt_diabetes_mortality <- get_places(geography = "census",
 #   theme(plot.title.position = "plot")
 
 # filter to just what's needed
-df_mslacounty <- mt_diabetes_mortality %>% 
-  #filter(countyname=="Missoula") %>% 
-  select(locationname, measureid, data_value) %>% 
-  rename(geo_id = locationname)
+# df_mslacounty <- df_cdcplaces_mt %>% 
+#   #filter(countyname=="Missoula") %>% 
+#   select(locationname, measureid, data_value) %>% 
+#   rename(geo_id = locationname)
 
 # pivot to wide format to create new variables for each of the three indicators
-df_mslacounty <- df_mslacounty %>%
+df_cdcplaces_mt <- df_cdcplaces_mt %>%
   pivot_wider(
     names_from = measureid,
     values_from = data_value,
     names_prefix = "perc_2021_"
   )
-
-write.csv(df_mslacounty, "data/cdc_places_data.csv", row.names = FALSE)
 
 
 # ************************************
@@ -320,28 +346,57 @@ write.csv(df_mslacounty, "data/cdc_places_data.csv", row.names = FALSE)
 # 
 # 
 # NEED TO CREATE A STATEWIDE MAPPING OF THE OLD CENSUS TRACTS -> NEW
-mapping_data <- data.frame(
-  `geo_id` = c('30063000100', '30063000201', '30063000201', '30063000202', '30063000202',
-               '30063000300', '30063000400', '30063000500', '30063000500', '30063000700',
-               '30063000800', '30063000800', '30063000901', '30063000902', '30063001000',
-               '30063001000', '30063001100', '30063001200', '30063001302', '30063001303',
-               '30063001304', '30063001400', '30063001400', '30063001500', '30063001500',
-               '30063001600', '30063001600', '30063001800', '30063001800'),
-  `geo_id_2024` = c('30063000100', '30063000203', '30063000204', '30063000205', '30063000206',
-                    '30063000300', '30063000400', '30063000501', '30063000502', '30063000700',
-                    '30063000801', '30063000802', '30063000901', '30063000902', '30063001001',
-                    '30063001002', '30063001100', '30063001200', '30063001302', '30063001303',
-                    '30063001304', '30063001401', '30063001402', '30063001501', '30063001502',
-                    '30063001601', '30063001602', '30063001801', '30063001802')
-)
-df_mslacounty <- merge(df_mslacounty, mapping_data, by.x = "geo_id", by.y = "geo_id") %>% 
+# mapping_data <- data.frame(
+#   `geo_id` = c('30063000100', '30063000201', '30063000201', '30063000202', '30063000202',
+#                '30063000300', '30063000400', '30063000500', '30063000500', '30063000700',
+#                '30063000800', '30063000800', '30063000901', '30063000902', '30063001000',
+#                '30063001000', '30063001100', '30063001200', '30063001302', '30063001303',
+#                '30063001304', '30063001400', '30063001400', '30063001500', '30063001500',
+#                '30063001600', '30063001600', '30063001800', '30063001800'),
+#   `geo_id_2024` = c('30063000100', '30063000203', '30063000204', '30063000205', '30063000206',
+#                     '30063000300', '30063000400', '30063000501', '30063000502', '30063000700',
+#                     '30063000801', '30063000802', '30063000901', '30063000902', '30063001001',
+#                     '30063001002', '30063001100', '30063001200', '30063001302', '30063001303',
+#                     '30063001304', '30063001401', '30063001402', '30063001501', '30063001502',
+#                     '30063001601', '30063001602', '30063001801', '30063001802')
+# )
+
+df_cdcplaces_mt <- merge(df_cdcplaces_mt, tract_mapping_df_key, by.x = "geo_id", by.y = "geo_id") %>% 
   select(-geo_id) %>% # remove the pre-2020 tract IDs
   rename(geo_id = geo_id_2024,
          perc_2021_diabetes = perc_2021_DIABETES,
          perc_2021_casthma = perc_2021_CASTHMA,
          perc_2021_chd = perc_2021_CHD)
 
-tract_ids <- df_mslacounty$geo_id 
+# one tract got condensed from 2 tracts in pre-2020 to just a single tract in post-2020. I'll take the average of the old tracts' values for each variable. 
+row_to_average <- df_cdcplaces_mt %>%
+  filter(geo_id %in% c('30031001700_a', '30031001700_b')) %>%
+  summarise(
+    geo_id = '30031001700', # create the new correct post-2020 geo_id
+    perc_2021_diabetes = mean(perc_2021_diabetes),
+    perc_2021_casthma = mean(perc_2021_casthma),
+    perc_2021_chd = mean(perc_2021_chd)
+  )
+
+df_cdcplaces_mt <- df_cdcplaces_mt %>%
+  filter(!geo_id %in% c('30031001700_a', '30031001700_b')) %>%
+  bind_rows(row_to_average)
+
+# Two tracts are not in the CDC Places data for some reason. Let's add them with NA values.
+na_rows <- data.frame(
+  geo_id = c('30035980000', '30067980600'),
+  perc_2021_diabetes = NA,
+  perc_2021_casthma = NA,
+  perc_2021_chd = NA
+)
+df_cdcplaces_mt <- bind_rows(df_cdcplaces_mt, na_rows)
+
+write.csv(df_cdcplaces_mt, "data/cdc_places_data_mt.csv", row.names = FALSE)
+
+
+
+# Now df_cdc_places_mt should have 319 rows corresponding to the 319 tracts in the post-2020 census
+tract_ids <- df_cdcplaces_mt$geo_id 
 
 fetch_data_for_tract <- function(tract_id) {
   url <- paste0("https://ejscreen.epa.gov/mapper/ejscreenRESTbroker1.aspx?",

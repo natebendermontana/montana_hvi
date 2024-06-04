@@ -10,59 +10,67 @@ options(scipen = 999)
 
 # setup
 df_census <- read.csv(here("data", "census_data.csv"))
-df_cdc_places <- read.csv(here("data", "cdc_places_data.csv"))
+df_cdc_places_mt <- read.csv(here("data", "cdc_places_data_mt.csv"))
 df_ejscreen <- read.csv(here("data", "ejscreen_data.csv"))
-df_arcgis_data <- read.csv(here("data", "arcgis_data.csv"))
+# df_arcgis_data <- read.csv(here("data", "arcgis_data.csv"))
+# 
+# df_arcgis_data <- df_arcgis_data %>% 
+#   select(-XCoord, -YCoord) %>% 
+#   rename(geo_id = FIPS)
 
-df_arcgis_data <- df_arcgis_data %>% 
-  select(-XCoord, -YCoord) %>% 
-  rename(geo_id = FIPS)
+df_census <- df_census %>%
+  select(starts_with("perc_"), geo_id, total_pop, area_sq_miles)
 
 df_python_data <- read.csv(here("outputs", "df_raster_analysis_final.csv"))
 df_python_data <- df_python_data %>% 
-  select(-area_sq_miles)
+  select(-area_sq_miles) %>% 
+  rename(
+    imperviousness_perc_mean = mean_perc_impervious,
+    canopy_perc_mean = mean_perc_canopy,
+    surface_temp_mean = mean_temp_f
+  )
 
 # testing the R approach versus the Python
-merged_data <- df_arcgis_data %>%
-  left_join(df_python_data, by = "geo_id")
-long_data <- merged_data %>%
-  select(geo_id, surface_temp_mean, mean_temp_f) %>%
-  pivot_longer(cols = c(surface_temp_mean, mean_temp_f), names_to = "source", values_to = "temperature")
-ggplot(long_data, aes(x = temperature, fill = source)) +
-  geom_histogram(alpha = 0.5, bins = 20, position = "identity") +
-  scale_fill_manual(values = c("surface_temp_mean" = "blue", "mean_temp_f" = "red"),
-                    labels = c("Surface Temp (ArcGIS Data)", "Mean Temp (Python Data)")) +
-  labs(title = "Histogram of Surface Temperature Means",
-       x = "Temperature (F)",
-       y = "Frequency",
-       fill = "Data Source") +
-  theme_minimal()
-
-long_data_canopy <- merged_data %>%
-  select(geo_id, canopy_perc_mean, mean_perc_canopy) %>%
-  pivot_longer(cols = c(canopy_perc_mean, mean_perc_canopy), names_to = "source", values_to = "canopy_percentage")
-ggplot(long_data_canopy, aes(x = canopy_percentage, fill = source)) +
-  geom_histogram(alpha = 0.5, bins = 20, position = "identity") +
-  scale_fill_manual(values = c("canopy_perc_mean" = "blue", "mean_perc_canopy" = "red"),
-                    labels = c("Canopy Percentage (ArcGIS Data)", "Mean Canopy Percentage (Python Data)")) +
-  labs(title = "Histogram of Canopy Percentage Means",
-       x = "Canopy Percentage",
-       y = "Frequency",
-       fill = "Data Source") +
-  theme_minimal()
-
-long_data_impervious <- merged_data %>%
-  select(geo_id, imperviousness_perc_mean, mean_perc_impervious) %>%
-  pivot_longer(cols = c(imperviousness_perc_mean, mean_perc_impervious), names_to = "source", values_to = "impervious_percentage")
-ggplot(long_data_impervious, aes(x = impervious_percentage, fill = source)) +
-  geom_histogram(alpha = 0.5, bins = 20, position = "identity") +
-  scale_fill_manual(values = c("imperviousness_perc_mean" = "blue", "mean_perc_impervious" = "red"),
-                    labels = c("Imperviousness Percentage (ArcGIS Data)", "Mean Imperviousness Percentage (Python Data)")) +
-  labs(title = "Histogram of Imperviousness Percentage Means",
-       x = "Imperviousness Percentage",
-       y = "Frequency",
-       fill = "Data Source") +
-  theme_minimal()
+# merged_data <- df_arcgis_data %>%
+#   left_join(df_python_data, by = "geo_id")
+# long_data <- merged_data %>%
+#   select(geo_id, surface_temp_mean, mean_temp_f) %>%
+#   pivot_longer(cols = c(surface_temp_mean, mean_temp_f), names_to = "source", values_to = "temperature")
+# ggplot(long_data, aes(x = temperature, fill = source)) +
+#   geom_histogram(alpha = 0.5, bins = 20, position = "identity") +
+#   scale_fill_manual(values = c("surface_temp_mean" = "blue", "mean_temp_f" = "red"),
+#                     labels = c("Surface Temp (ArcGIS Data)", "Mean Temp (Python Data)")) +
+#   labs(title = "Histogram of Surface Temperature Means",
+#        x = "Temperature (F)",
+#        y = "Frequency",
+#        fill = "Data Source") +
+#   theme_minimal()
+# 
+# long_data_canopy <- merged_data %>%
+#   select(geo_id, canopy_perc_mean, mean_perc_canopy) %>%
+#   pivot_longer(cols = c(canopy_perc_mean, mean_perc_canopy), names_to = "source", values_to = "canopy_percentage")
+# ggplot(long_data_canopy, aes(x = canopy_percentage, fill = source)) +
+#   geom_histogram(alpha = 0.5, bins = 20, position = "identity") +
+#   scale_fill_manual(values = c("canopy_perc_mean" = "blue", "mean_perc_canopy" = "red"),
+#                     labels = c("Canopy Percentage (ArcGIS Data)", "Mean Canopy Percentage (Python Data)")) +
+#   labs(title = "Histogram of Canopy Percentage Means",
+#        x = "Canopy Percentage",
+#        y = "Frequency",
+#        fill = "Data Source") +
+#   theme_minimal()
+# 
+# long_data_impervious <- merged_data %>%
+#   select(geo_id, imperviousness_perc_mean, mean_perc_impervious) %>%
+#   pivot_longer(cols = c(imperviousness_perc_mean, mean_perc_impervious), names_to = "source", values_to = "impervious_percentage")
+# ggplot(long_data_impervious, aes(x = impervious_percentage, fill = source)) +
+#   geom_histogram(alpha = 0.5, bins = 20, position = "identity") +
+#   scale_fill_manual(values = c("imperviousness_perc_mean" = "blue", "mean_perc_impervious" = "red"),
+#                     labels = c("Imperviousness Percentage (ArcGIS Data)", "Mean Imperviousness Percentage (Python Data)")) +
+#   labs(title = "Histogram of Imperviousness Percentage Means",
+#        x = "Imperviousness Percentage",
+#        y = "Frequency",
+#        fill = "Data Source") +
+#   theme_minimal()
 
 
 
@@ -72,38 +80,37 @@ ggplot(long_data_impervious, aes(x = impervious_percentage, fill = source)) +
 # splitting existing larger tracts into two smaller pieces, to account for population growth. As a crude workaround,
 # I've simply applied the pre-2020 data to the new post-2020 tracts. For instance, data for pre-2020 tract "30063001800" has been mapped
 # to the two new tracts that together make up that old tract boundary:  '30063001801' and '30063001802'
-mapping_data <- data.frame(
-  `geo_id` = c('30063000100', '30063000201', '30063000201', '30063000202', '30063000202',
-               '30063000300', '30063000400', '30063000500', '30063000500', '30063000700',
-               '30063000800', '30063000800', '30063000901', '30063000902', '30063001000',
-               '30063001000', '30063001100', '30063001200', '30063001302', '30063001303',
-               '30063001304', '30063001400', '30063001400', '30063001500', '30063001500',
-               '30063001600', '30063001600', '30063001800', '30063001800'),
-  `geo_id_2024` = c('30063000100', '30063000203', '30063000204', '30063000205', '30063000206',
-                    '30063000300', '30063000400', '30063000501', '30063000502', '30063000700',
-                    '30063000801', '30063000802', '30063000901', '30063000902', '30063001001',
-                    '30063001002', '30063001100', '30063001200', '30063001302', '30063001303',
-                    '30063001304', '30063001401', '30063001402', '30063001501', '30063001502',
-                    '30063001601', '30063001602', '30063001801', '30063001802')
-)
-
-df_cdc_places <- merge(df_cdc_places, mapping_data, by.x = "geo_id", by.y = "geo_id")
-df_cdc_places <- df_cdc_places %>% 
-  mutate(
-    geo_id_2024 = as.numeric(as.character(geo_id_2024))) %>%
-  select(-geo_id) %>% # remove the pre-2020 tract IDs
-  rename(geo_id = geo_id_2024,
-         perc_2021_diabetes = perc_2021_DIABETES,
-         perc_2021_casthma = perc_2021_CASTHMA,
-         perc_2021_chd = perc_2021_CHD)
-
-df_census <- df_census %>%
-  select(starts_with("perc_"), geo_id, total_pop, area_sq_miles)
+# mapping_data <- data.frame(
+#   `geo_id` = c('30063000100', '30063000201', '30063000201', '30063000202', '30063000202',
+#                '30063000300', '30063000400', '30063000500', '30063000500', '30063000700',
+#                '30063000800', '30063000800', '30063000901', '30063000902', '30063001000',
+#                '30063001000', '30063001100', '30063001200', '30063001302', '30063001303',
+#                '30063001304', '30063001400', '30063001400', '30063001500', '30063001500',
+#                '30063001600', '30063001600', '30063001800', '30063001800'),
+#   `geo_id_2024` = c('30063000100', '30063000203', '30063000204', '30063000205', '30063000206',
+#                     '30063000300', '30063000400', '30063000501', '30063000502', '30063000700',
+#                     '30063000801', '30063000802', '30063000901', '30063000902', '30063001001',
+#                     '30063001002', '30063001100', '30063001200', '30063001302', '30063001303',
+#                     '30063001304', '30063001401', '30063001402', '30063001501', '30063001502',
+#                     '30063001601', '30063001602', '30063001801', '30063001802')
+# )
+# 
+# df_cdc_places <- merge(df_cdc_places, mapping_data, by.x = "geo_id", by.y = "geo_id")
+# df_cdc_places <- df_cdc_places %>% 
+#   mutate(
+#     geo_id_2024 = as.numeric(as.character(geo_id_2024))) %>%
+#   select(-geo_id) %>% # remove the pre-2020 tract IDs
+#   rename(geo_id = geo_id_2024,
+#          perc_2021_diabetes = perc_2021_DIABETES,
+#          perc_2021_casthma = perc_2021_CASTHMA,
+#          perc_2021_chd = perc_2021_CHD)
 
 
-### join all the prepared dataset
+
+
+### join all the prepared datasets
 df_full <- df_census %>% 
-  left_join(df_cdc_places, by = "geo_id") %>% 
+  left_join(df_cdc_places_mt, by = "geo_id") %>% 
   select(geo_id, total_pop, area_sq_miles, perc_over_65, perc_under_5, 
          perc_disability, 
          perc_built_pre1960,
@@ -129,22 +136,40 @@ df_full <- df_full %>%
 #   left_join(df_arcgis_data, by = "geo_id")
 
 df_full <- df_full %>% 
-  left_join(df_arcgis_data, by = "geo_id")
+  left_join(df_python_data, by = "geo_id")
 
 # create the impervious-to-canopy ratio variable
 # The index was multiplied by -1 so that higher values correspond to more impervious coverage area and
 # therefore a greater risk of an urban heat island. 
 # This was the previous R packages approach; replacing it now with the index derived in python from that approach.
-df_full <- df_full %>%
-  mutate(impervious_canopy_index = 
-           -1 * ((canopy_perc_mean * area_sq_miles) - (imperviousness_perc_mean * area_sq_miles)) /
-           ((canopy_perc_mean * area_sq_miles) + (imperviousness_perc_mean * area_sq_miles))
-  )
+# df_full <- df_full %>%
+#   mutate(impervious_canopy_index = 
+#            -1 * ((canopy_perc_mean * area_sq_miles) - (imperviousness_perc_mean * area_sq_miles)) /
+#            ((canopy_perc_mean * area_sq_miles) + (imperviousness_perc_mean * area_sq_miles))
+#   )
+
+
+# missingness
+library(naniar)
+library(visdat)
+
+vis_miss(df_full)
+
+df_full %>%
+  summarise_all(~ sum(is.na(.)))
+
+df_full %>%
+  filter(!complete.cases(.)) %>%
+  n_distinct()
+
+df_full_complete <- df_full %>% 
+  filter(complete.cases(.))
+  
 
 ###
 ### Box Cox transformation
 ### 
-long_data <- df_full %>%
+long_data <- df_full_complete %>%
   select(starts_with("perc_"), pm25_statepercentile, o3_statepercentile, impervious_canopy_index, surface_temp_mean) %>% 
   pivot_longer(cols = everything(), names_to = "Variable", values_to = "Value")
 
@@ -155,8 +180,8 @@ ggplot(long_data, aes(x = Value)) +
   theme_minimal() +
   labs(title = "ORIGINAL", x = "Value", y = "Count")
 
-df_full_transformed <- df_full # create duplicate for transformation
-cols_to_transform <- setdiff(names(df_full), c("geo_id", "total_pop", "area_sq_miles", "imperviousness_perc_mean", "canopy_perc_mean"))
+df_full_transformed <- df_full_complete # create duplicate for transformation
+cols_to_transform <- setdiff(names(df_full_complete), c("geo_id", "total_pop", "area_sq_miles", "imperviousness_perc_mean", "canopy_perc_mean"))
 
 # Ensure all values are positive for Box-Cox transformation
 df_full_transformed[cols_to_transform] <- lapply(df_full_transformed[cols_to_transform], function(x) {
@@ -250,6 +275,12 @@ df_final <- df_final %>%
            hvi_index_ranked == 5 ~ "High",
            TRUE ~ NA_character_))
 
+# QA / explore the results a bit
+ggplot(df_final, aes(x = hvi_index)) +
+  geom_histogram(binwidth = .05, color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of HVI Index Values", x = "HVI Index", y = "Count")
+
 # rename variables so I don't have to do it manually in ArcGIS
 new_names <- c(
   "GEOID" = "geo_id",
@@ -303,8 +334,9 @@ new_names <- c(
 )
 
 # Rename specified columns in df_final
-df_final <- df_final %>%
+df_final_named <- df_final %>%
   rename(!!!new_names)
 
-write.csv(df_final, "data/df_final_formap.csv", row.names = FALSE)
+# write the data out for mapping in ArcGIS
+write.csv(df_final_named, "data/df_final_formap.csv", row.names = FALSE)
 
