@@ -1,6 +1,7 @@
 # user files
 .DS_Store
 /data
+/outputs
 
 # History files
 .Rhistory
