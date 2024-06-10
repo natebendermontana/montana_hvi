@@ -5,19 +5,22 @@ library(tidyr)
 library(ggplot2)
 options(scipen = 999)
 
-df_equal_weight <- read.csv(here("data", "df_final_formap.csv"))
-df_topsis <- read.csv(here("data", "df_topsis.csv"))
+df_equal_weight_full <- read.csv(here("data", "df_final_formap.csv"))
+df_topsis_full <- read.csv(here("data", "df_topsis.csv"))
+
+df_equal_weight_full <- df_equal_weight_full %>%
+  rename(HVI_equal_weight_cat = HVI.Category,
+         geo_id = GEOID) %>% 
+  select(geo_id, HVI_equal_weight_cat, hvi_index)
+
 
 # Ensure df_equal_weight has unique geo_id and the proper column
-df_equal_weight <- df_equal_weight %>%
-  rename(HVI_equal_weight_cat = HVI.Category,
-         geo_id = GEOID) %>%
+df_equal_weight <- df_equal_weight_full %>% 
   mutate(HVI_equal_weight_cat = factor(HVI_equal_weight_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))) %>%
-  distinct(geo_id, .keep_all = TRUE) %>% 
-  select(geo_id, HVI_equal_weight_cat)
+  distinct(geo_id, .keep_all = TRUE)
 
 # Ensure df_topsis has unique geo_id and calculate predominant category for each unique geo_id
-df_topsis <- df_topsis %>%
+df_topsis <- df_topsis_full %>%
   rename(HVI_topsis_cat = rank_grouped) %>%
   mutate(HVI_topsis_cat = factor(HVI_topsis_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))) %>%
   group_by(geo_id) %>%
@@ -26,7 +29,6 @@ df_topsis <- df_topsis %>%
 
 comparison_df <- df_equal_weight %>%
   left_join(df_topsis, by = "geo_id")  # Join with the summarized df_topsis
-
 
 # Calculate agreement
 comparison_df <- comparison_df %>%
@@ -46,3 +48,37 @@ ggplot(comparison_df, aes(
        y = "Equal Weight Category",
        color = "Agreement") +
   theme_minimal()
+
+
+# another approach, using the quantitative vulnerability estimators rather than the categories
+df_equal_weight_quant <- df_equal_weight_full %>%
+  mutate(hvi_percentile = percent_rank(hvi_index))
+
+df_topsis_quant <- df_topsis_full %>%
+  group_by(geo_id) %>%
+  summarize(median_closeness = median(Closeness)) %>%
+  ungroup()
+
+df_topsis_quant <- df_topsis_quant %>%
+  mutate(closeness_percentile = percent_rank(median_closeness)) 
+
+comparison_percentiles <- df_equal_weight_quant %>%
+  select(geo_id, hvi_percentile) %>%
+  left_join(df_topsis_quant %>% select(geo_id, closeness_percentile), by = "geo_id")
+
+ggplot(comparison_percentiles, aes(x = hvi_percentile, y = closeness_percentile)) +
+  geom_point(aes(color = hvi_percentile), alpha = 0.6) +
+  scale_color_gradient(low = "blue", high = "red") +
+  labs(title = "Comparison of Percentile Ranks for Vulnerability Estimates",
+       x = "HVI Percentile (Equal Weight Method)",
+       y = "Median Closeness Percentile (TOPSIS Method)",
+       color = "HVI Percentile") +
+  theme_minimal()
+
+pearson_corr <- cor(comparison_percentiles$hvi_percentile, comparison_percentiles$closeness_percentile, method = "pearson")
+spearman_corr <- cor(comparison_percentiles$hvi_percentile, comparison_percentiles$closeness_percentile, method = "spearman")
+cat("Pearson Correlation between HVI Percentile and Closeness Percentile:", pearson_corr, "\n")
+cat("Spearman Correlation between HVI Percentile and Closeness Percentile:", spearman_corr, "\n")
+
+write.csv(comparison_percentiles, "data/df_methodology_comparison.csv", row.names = FALSE)
+
