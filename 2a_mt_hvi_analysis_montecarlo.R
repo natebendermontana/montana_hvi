@@ -12,8 +12,6 @@ library(tibble)
 library(mc2d)
 library(tidycensus)
 library(RColorBrewer)
-
-
 options(scipen = 999)
 
 # setup
@@ -57,11 +55,6 @@ kh_df <- kh_df %>%
          County = sub(" County", "", County)) %>% 
   select(State, County, Historical, MC_no, mc_killer_heat_diff)
 
-
-
-
-
-
 ### join all the prepared datasets
 df_full <- df_census %>% 
   left_join(df_cdc_places_mt, by = "geo_id") %>% 
@@ -99,23 +92,25 @@ df_full_complete <- df_full %>%
   filter(complete.cases(.))
 
 #### MCDA analysis with Monte Carlo simulations
-cols <- c("geo_id", "perc_over_65", "perc_under_5", "perc_disability", "perc_built_pre1960",
+cols <- c("geo_id","surface_temp_mean", "mc_killer_heat_diff", "perc_over_65", "perc_under_5", "perc_disability", "perc_built_pre1960",
           "perc_outdoor_workers", "perc_households_alone", "perc_pop_poverty", "perc_unemployed",
           "perc_speakenglish_less_verywell", "perc_no_hs_degree", "perc_nonwhite", 
           "perc_no_health_ins", "perc_2021_diabetes", "perc_2021_casthma", 
           "perc_2021_chd", "pm25_statepercentile", "o3_statepercentile", 
-          "impervious_canopy_index", "surface_temp_mean", "mc_killer_heat_diff")
+          "impervious_canopy_index")
 
 data <- df_full_complete %>%
   select(all_of(cols)) %>%
   column_to_rownames(var = "geo_id")
 
 data_norm <- as.data.frame(scale(data, center = FALSE, scale = sqrt(colSums(data^2))))
-crit <- rep("min", length(cols) - 1)  # Exclude the geo_id column. All variables are in the same direction (min) for ideal scenario.
+crit <- rep("max", length(cols) - 1)  # Exclude the geo_id column. 
+# All variables are set to "max" indicating that the "positive" ideal scenario we want TOPSIS to solve for is a
+# census tract with "ideal" vulnerability - all of these indicator variables maxed out.
 
 n <- 10000
 res <- matrix(0, nrow = n, ncol = nrow(data_norm))
-fixed_weights <- c("surface_temp_mean" = 0.20, "mc_killer_heat_diff" = 0.2)
+fixed_weights <- c("surface_temp_mean" = 0.2, "mc_killer_heat_diff" = 0.2)
 remaining_weight <- 1 - sum(fixed_weights)
 
 
@@ -123,8 +118,10 @@ set.seed(123) # For reproducibility
 
 for (i in 1:n) {
   # Generate random weights for all criteria
-  rand_wts <- rdirichlet(1, rep(1, length(cols) - 3)) * remaining_weight  # 18 variables excluding the two fixed weight variables
+  rand_wts <- rdirichlet(1, rep(1, length(cols) - 3)) # remaining_weight  # 18 variables excluding the two fixed weight variables
   wts <- c(fixed_weights["surface_temp_mean"], fixed_weights["mc_killer_heat_diff"], as.vector(rand_wts))
+  # wts <- as.vector(rand_wts) # if equal weighting
+
   
   # Conduct TOPSIS analysis
   topsis_result <- TOPSIS(performanceTable = data_norm, 
@@ -329,5 +326,6 @@ plot_climate_region("North_Central", climate_regions$North_Central)
 plot_climate_region("South_Central", climate_regions$South_Central)
 plot_climate_region("Central", climate_regions$Central)
 
-write.csv(res_melt, "data/df_topsis.csv", row.names = FALSE)
+# write.csv(res_melt, "data/df_topsis.csv", row.names = FALSE)
+write.csv(res_melt, "data/df_topsis_weighted.csv", row.names = FALSE)
 
