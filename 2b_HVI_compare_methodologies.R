@@ -9,6 +9,13 @@ df_equal_weight_full <- read.csv(here("data", "df_final_formap.csv"))
 df_topsis_full <- read.csv(here("data", "df_topsis.csv"))
 df_topsis_weights_full <- read.csv(here("data", "df_topsis_weighted.csv"))
 
+vulnerability_colors <- c(
+  "Low" = "#99d8c9",            # Light blue
+  "Moderate Low" = "#c9e2f5",   # Light purple
+  "Moderate" = "#fdd49e",       # Light orange
+  "Moderate High" = "#fb8726",  # Medium orange
+  "High" = "#a60000"            # Red
+)
 
 df_equal_weight_full <- df_equal_weight_full %>%
   rename(HVI_equal_weight_cat = HVI.Category,
@@ -40,17 +47,23 @@ comparison_df <- comparison_df %>%
 agreement_perc <- mean(comparison_df$agreement) * 100
 
 # Scatterplot of categories
-ggplot(comparison_df, aes(
+unweight_cat_chart <- ggplot(comparison_df, aes(
   x = factor(predominant_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High")),
   y = factor(HVI_equal_weight_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))
 )) +
   geom_jitter(aes(color = agreement), width = 0.2, height = 0.2) +
   scale_color_manual(values = c("TRUE" = "#66c2a5", "FALSE" = "#fc8d62")) +
   labs(title = "Scatter Plot of Vulnerability Category Comparison",
-       x = "TOPSIS Predominant Category",
+       x = "Unweighted TOPSIS Predominant Category",
        y = "Equal Weight Category",
        color = "Agreement") +
   theme_minimal()
+
+unweight_cat_chart
+ggsave(
+  plot = unweight_cat_chart,
+  filename = "outputs/unweighted_category_chart.png",
+  bg = "transparent")
 
 # another approach, using the quantitative vulnerability estimators rather than the categories
 df_equal_weight_quant <- df_equal_weight_full %>%
@@ -68,14 +81,20 @@ comparison_percentiles <- df_equal_weight_quant %>%
   select(geo_id, hvi_percentile) %>%
   left_join(df_topsis_quant %>% select(geo_id, closeness_percentile), by = "geo_id")
 
-ggplot(comparison_percentiles, aes(x = hvi_percentile, y = closeness_percentile)) +
+unweight_scatter_chart <- ggplot(comparison_percentiles, aes(x = closeness_percentile, y = hvi_percentile)) +
   geom_point() +
   scale_color_manual(values = vulnerability_colors) +
   labs(title = "Comparison of Percentile Ranks for Vulnerability Estimates",
-       x = "HVI Percentile (Equal Weight Method)",
-       y = "Median Closeness Percentile (Unweighted TOPSIS Method)",
+       x = "Median Closeness Percentile (Unweighted TOPSIS Method)",
+       y = "HVI Percentile (Equal Weight Method)",
        color = "HVI Percentile Category") +
   theme_minimal()
+
+unweight_scatter_chart
+ggsave(
+  plot = unweight_scatter_chart,
+  filename = "outputs/unweighted_scatter_chart.png",
+  bg = "transparent")
 
 pearson_corr <- cor(comparison_percentiles$hvi_percentile, comparison_percentiles$closeness_percentile, method = "pearson")
 spearman_corr <- cor(comparison_percentiles$hvi_percentile, comparison_percentiles$closeness_percentile, method = "spearman")
@@ -104,7 +123,7 @@ comparison_df_weights <- comparison_df_weights %>%
 # Calculate the percentage of agreement
 agreement_perc <- mean(comparison_df_weights$agreement) * 100
 
-ggplot(comparison_df_weights, aes(
+weight_cat_chart <- ggplot(comparison_df_weights, aes(
   x = factor(predominant_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High")),
   y = factor(HVI_equal_weight_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))
 )) +
@@ -115,6 +134,12 @@ ggplot(comparison_df_weights, aes(
        y = "Equal Weight Category",
        color = "Agreement") +
   theme_minimal()
+
+weight_cat_chart
+ggsave(
+  plot = weight_cat_chart,
+  filename = "outputs/weighted_category_chart.png",
+  bg = "transparent")
 
 
 # another approach, using the quantitative vulnerability estimators rather than the categories
@@ -133,14 +158,20 @@ comparison_weights_percentiles <- df_equal_weight_quant %>%
   select(geo_id, hvi_percentile) %>%
   left_join(df_topsis_weights_quant %>% select(geo_id, closeness_percentile), by = "geo_id")
 
-ggplot(comparison_weights_percentiles, aes(x = hvi_percentile, y = closeness_percentile)) +
+weight_scatter_chart <- ggplot(comparison_weights_percentiles, aes(x = closeness_percentile, y = hvi_percentile)) +
   geom_point() +
   #scale_color_gradient(low = "blue", high = "red") +
   labs(title = "Comparison of Percentile Ranks for Vulnerability Estimates",
-       x = "HVI Percentile (Equal Weight Method)",
-       y = "Median Closeness Percentile (Weighted TOPSIS Method)",
+       x = "Median Closeness Percentile (Weighted TOPSIS Method)",
+       y = "HVI Percentile (Equal Weight Method)",
        color = "HVI Percentile") +
   theme_minimal()
+
+weight_scatter_chart
+ggsave(
+  plot = weight_scatter_chart,
+  filename = "outputs/weighted_scatter_chart.png",
+  bg = "transparent")
 
 pearson_corr <- cor(comparison_weights_percentiles$hvi_percentile, comparison_weights_percentiles$closeness_percentile, method = "pearson")
 spearman_corr <- cor(comparison_weights_percentiles$hvi_percentile, comparison_weights_percentiles$closeness_percentile, method = "spearman")

@@ -92,12 +92,23 @@ df_full_complete <- df_full %>%
   filter(complete.cases(.))
 
 #### MCDA analysis with Monte Carlo simulations
+# unweighted is everything except "mc_killer_heat_diff"
+# bc that var was not in the NJ approach
+# cols <- c("geo_id","surface_temp_mean", "perc_over_65", "perc_under_5", "perc_disability", "perc_built_pre1960",
+#           "perc_outdoor_workers", "perc_households_alone", "perc_pop_poverty", "perc_unemployed",
+#           "perc_speakenglish_less_verywell", "perc_no_hs_degree", "perc_nonwhite", 
+#           "perc_no_health_ins", "perc_2021_diabetes", "perc_2021_casthma", 
+#           "perc_2021_chd", "pm25_statepercentile", "o3_statepercentile", 
+#           "impervious_canopy_index")
+
 cols <- c("geo_id","surface_temp_mean", "mc_killer_heat_diff", "perc_over_65", "perc_under_5", "perc_disability", "perc_built_pre1960",
           "perc_outdoor_workers", "perc_households_alone", "perc_pop_poverty", "perc_unemployed",
-          "perc_speakenglish_less_verywell", "perc_no_hs_degree", "perc_nonwhite", 
-          "perc_no_health_ins", "perc_2021_diabetes", "perc_2021_casthma", 
-          "perc_2021_chd", "pm25_statepercentile", "o3_statepercentile", 
+          "perc_speakenglish_less_verywell", "perc_no_hs_degree", "perc_nonwhite",
+          "perc_no_health_ins", "perc_2021_diabetes", "perc_2021_casthma",
+          "perc_2021_chd", "pm25_statepercentile", "o3_statepercentile",
           "impervious_canopy_index")
+fixed_weights <- c("surface_temp_mean" = 0.25, "mc_killer_heat_diff" = 0.25)
+remaining_weight <- 1 - sum(fixed_weights)
 
 data <- df_full_complete %>%
   select(all_of(cols)) %>%
@@ -108,19 +119,18 @@ crit <- rep("max", length(cols) - 1)  # Exclude the geo_id column.
 # All variables are set to "max" indicating that the "positive" ideal scenario we want TOPSIS to solve for is a
 # census tract with "ideal" vulnerability - all of these indicator variables maxed out.
 
-n <- 10000
+n <- 10
 res <- matrix(0, nrow = n, ncol = nrow(data_norm))
-fixed_weights <- c("surface_temp_mean" = 0.2, "mc_killer_heat_diff" = 0.2)
-remaining_weight <- 1 - sum(fixed_weights)
-
 
 set.seed(123) # For reproducibility
-
 for (i in 1:n) {
-  # Generate random weights for all criteria
-  rand_wts <- rdirichlet(1, rep(1, length(cols) - 3)) # remaining_weight  # 18 variables excluding the two fixed weight variables
-  wts <- c(fixed_weights["surface_temp_mean"], fixed_weights["mc_killer_heat_diff"], as.vector(rand_wts))
-  # wts <- as.vector(rand_wts) # if equal weighting
+  # for equal weight scenario
+  #rand_wts <- rdirichlet(1, rep(1, length(cols) - 1)) # only geoid gets removed
+  #wts <- as.vector(rand_wts)
+  
+  # for weighted scenario
+  rand_wts <- rdirichlet(1, rep(1, length(cols) - 3)) # geoid and the two fixed vars get removed
+  wts <- c(fixed_weights["surface_temp_mean"], fixed_weights["mc_killer_heat_diff"], as.vector(rand_wts)) # for weighted scenario
 
   
   # Conduct TOPSIS analysis
@@ -141,9 +151,7 @@ colnames(res_melt)[2] <- "Iteration"
 res_melt$county_fips <- substr(res_melt$geo_id, 1, 5)
 
 geo_ids <- res_df$geo_id
-#state_fips <- substr(geo_ids, 1, 2)
 county_fips <- substr(geo_ids, 3, 5)
-#fips_codes <- paste0(state_fips, county_fips)
 census_api_key <- trimws(readLines("/Users/natebender/Desktop/repo/census_2024_api_key.txt"))
 census_api_key(census_api_key, install = TRUE, overwrite = TRUE)
 readRenviron("~/.Renviron")
@@ -154,116 +162,33 @@ res_melt$NAME <- sub(" County, Montana", "", res_melt$NAME)
 res_melt <- res_melt %>% 
   rename(county_name = NAME)
 
-#### Ranking
-# lower_abs <- 0.25
-# mid_abs <- 0.5
-# upper_abs <- 0.75
+#### Ranking - hardcoding the cutoffs
+# lower_abs <- 0.2
+# midlow_abs <- 0.4
+# midhigh_abs <- 0.6
+# upper_abs <- 0.8
 # res_melt$rank_grouped <- rep(0, nrow(res_melt))
-# 
-# res_melt$rank_grouped[res_melt$Closeness >= upper_abs] <- 4
-# res_melt$rank_grouped[res_melt$Closeness < upper_abs & res_melt$Closeness >= mid_abs] <- 3
-# res_melt$rank_grouped[res_melt$Closeness < mid_abs & res_melt$Closeness >= lower_abs] <- 2
+#cutoffs <- c(.2, .4, .6, .8)
+
+# res_melt$rank_grouped[res_melt$Closeness >= upper_abs] <- 5
+# res_melt$rank_grouped[res_melt$Closeness < upper_abs & res_melt$Closeness >= midhigh_abs] <- 4
+# res_melt$rank_grouped[res_melt$Closeness < midhigh_abs & res_melt$Closeness >= midlow_abs] <- 3
+# res_melt$rank_grouped[res_melt$Closeness < midlow_abs & res_melt$Closeness >= lower_abs] <- 2
 # res_melt$rank_grouped[res_melt$Closeness < lower_abs] <- 1
+# category_names <- c("1" = "Low", "2" = "Moderate Low", "3" = "Moderate", "4" = "Moderate High", "5" = "High")
 
-# trying percentile-based cutoffs
+# Percentile-based cutoffs
 cutoffs <- quantile(res_melt$Closeness, probs = c(0.2, 0.4, 0.6, 0.8))
+res_melt$rank_grouped[res_melt$Closeness >= cutoffs[4]] <- 5
+res_melt$rank_grouped[res_melt$Closeness < cutoffs[4] & res_melt$Closeness >= cutoffs[3]] <- 4
+res_melt$rank_grouped[res_melt$Closeness < cutoffs[3] & res_melt$Closeness >= cutoffs[2]] <- 3
+res_melt$rank_grouped[res_melt$Closeness < cutoffs[2] & res_melt$Closeness >= cutoffs[1]] <- 2
+res_melt$rank_grouped[res_melt$Closeness < cutoffs[1]] <- 1
 
-res_melt <- res_melt %>%
-  mutate(rank_grouped = case_when(
-    Closeness < cutoffs[1] ~ "Low",
-    Closeness >= cutoffs[1] & Closeness < cutoffs[2] ~ "Moderate_Low",
-    Closeness >= cutoffs[2] & Closeness < cutoffs[3] ~ "Moderate",
-    Closeness >= cutoffs[3] & Closeness < cutoffs[4] ~ "Moderate_High",
-    Closeness >= cutoffs[4] ~ "High"
-  ))
-
-# Create a mapping for the rank_grouped to descriptive labels
-# grp_dict <- c("1" = "Low", "2" = "Medium-low", "3" = "Medium-high", "4" = "High")
-# res_melt$rank_grouped <- factor(res_melt$rank_grouped, levels = c(1, 2, 3, 4), labels = grp_dict)
-res_melt$rank_grouped <- factor(res_melt$rank_grouped, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))
-
-
-# 
-# r_western <- c("Lincoln", "Flathead", "Sanders", "Lake", "Mineral", "Missoula", "Ravalli", "Granite", "Deer Lodge", "Powell")
-# r_southwestern <- c("Beaverhead", "Madison", "Silver Bow", "Jefferson", "Gallatin")
-# r_north_central <- c("Glacier", "Toole", "Liberty", "Hill", "Blaine", "Chouteau", "Pondera", "Teton")
-# r_central <- c("Cascade", "Lewis and Clark", "Broadwater", "Meagher", "Judith Basin", "Fergus")
-# r_south_central <- c("Park", "Sweet Grass", "Stillwater", "Carbon", "Yellowstone")
-# r_northeastern <- c("Daniels", "Sheridan", "Roosevelt", "Valley", "Phillips")
-# r_southeastern <- c("Garfield", "McCone", "Richland", "Dawson", "Wibaux", "Fallon", "Prairie", "Carter", "Powder River", "Custer", "Rosebud", "Treasure", "Musselshell", "Golden Valley", "Petroleum")
-# 
-# climate_region_lookup <- c(
-#   setNames(rep("Western", length(r_western)), r_western),
-#   setNames(rep("Southwestern", length(r_southwestern)), r_southwestern),
-#   setNames(rep("North Central", length(r_north_central)), r_north_central),
-#   setNames(rep("Central", length(r_central)), r_central),
-#   setNames(rep("South Central", length(r_south_central)), r_south_central),
-#   setNames(rep("Northeastern", length(r_northeastern)), r_northeastern),
-#   setNames(rep("Southeastern", length(r_southeastern)), r_southeastern)
-# )
-# 
-# res_melt <- res_melt %>%
-#   mutate(climate_region = climate_region_lookup[county_name])
-# 
-# ggplot(res_melt, aes(x = Closeness)) +
-#   geom_histogram(binwidth = 0.05, fill = "#69b3a2", color = "#e9ecef", alpha = 0.9) +
-#   theme_minimal() +
-#   labs(title = "Histogram of Closeness Values", 
-#        x = "Closeness", 
-#        y = "Frequency") +
-#   theme(plot.title = element_text(hjust = 0.5))
-# 
-# 
-# 
-# # Break down by climate regions
-# eastern_counties <- c(r_northeastern, r_southeastern, r_south_central)
-# western_counties <- c(r_western, r_southwestern, r_central, r_north_central)
-# 
-# 
-# region_w <- res_melt %>%
-#   filter(county_name %in% western_counties)
-# 
-# region_e <- res_melt %>%
-#   filter(county_name %in% eastern_counties)
-# 
-# #num_counties <- length(unique(region_w$county_name))
-# 
-# num_regions <- length(unique(res_melt$climate_region))
-# 
-# 
-# predominant_category_w <- region_w %>%
-#   group_by(geo_id) %>%
-#   summarize(predominant_rank_w = names(sort(table(rank_grouped), decreasing = TRUE)[1]))
-# region_w <- region_w %>%
-#   left_join(predominant_category_w, by = "geo_id")
-# 
-# predominant_category_e <- region_e %>%
-#   group_by(geo_id) %>%
-#   summarize(predominant_rank_e = names(sort(table(rank_grouped), decreasing = TRUE)[1]))
-# region_e <- region_e %>%
-#   left_join(predominant_category_e, by = "geo_id")
-# 
-# ggplot(res_melt %>%
-#          filter(county_name %in% r_southeastern), aes(x = Closeness, y = reorder(geo_id, Closeness), fill = predominant_rank_e)) +
-#   geom_boxplot(outlier.size = 1) +
-#   theme_minimal() +
-#   theme(axis.text.y = element_text(size = 9)) +  # Adjusting font size for y-axis labels
-#   scale_fill_manual(values = vulnerability_colors) +
-#   labs(title = "Eastern MT", y = "Geo ID", x = "Closeness", fill = "County Name") +
-#   guides(fill = guide_legend(title = "Vulnerability Category")) +
-#   # Add vertical lines at .25, .5, and .75 on the x-axis
-#   geom_vline(xintercept = c(0.25, 0.5, 0.75), color = "#ff5353", linetype = "dashed", linewidth=1.2) 
-
-
-# ggplot(region_w, aes(x = Closeness, y = reorder(geo_id, Closeness), fill = predominant_rank_w)) +
-#   geom_boxplot(outlier.size = 1) +
-#   theme_minimal() +
-#   theme(axis.text.y = element_text(size = 9)) +  # Adjusting font size for y-axis labels
-#   scale_fill_manual(values = vulnerability_colors) +
-#   labs(title = "Western MT", y = "Geo ID", x = "Closeness", fill = "County Name") +
-#   guides(fill = guide_legend(title = "Vulnerability Category")) +
-#   # Add vertical lines at .25, .5, and .75 on the x-axis
-#   geom_vline(xintercept = c(0.25, 0.5, 0.75), color = "#ff5353", linetype = "dashed", linewidth=1.2) 
+# Convert numerical categories to descriptive names using the factor function
+res_melt$rank_grouped <- factor(res_melt$rank_grouped, 
+                                levels = 1:5, 
+                                labels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"))
 
 climate_regions <- list(
   Western = c("Lincoln", "Flathead", "Sanders", "Lake", "Mineral", "Missoula", "Ravalli", "Granite", "Deer Lodge", "Powell"),
@@ -279,44 +204,113 @@ climate_regions <- list(
 
 vulnerability_colors <- c(
   "Low" = "#99d8c9",            # Light blue
-  "Moderate_Low" = "#c9e2f5",   # Light purple
+  "Moderate Low" = "#c9e2f5",   # Light purple
   "Moderate" = "#fdd49e",       # Light orange
-  "Moderate_High" = "#fb8726",  # Medium orange
+  "Moderate High" = "#fb8726",  # Medium orange
   "High" = "#a60000"            # Red
 )
 # vulnerability_colors <- viridis::viridis(5, option = "B")
 vulnerability_colors <- rev(brewer.pal(5, "RdYlGn"))
 vulnerability_colors <- setNames(vulnerability_colors, levels(res_melt$rank_grouped))
 
-
 plot_climate_region <- function(region_name, region_counties) {
-  # Filter the data for the specified region
   region_data <- res_melt %>%
     filter(county_name %in% region_counties)
-  
-  # Calculate the predominant category for each geo_id
-  predominant_category <- region_data %>%
+
+  # Calculate the median Closeness for each geo_id
+  df_median_closeness <- region_data %>%
     group_by(geo_id) %>%
-    summarize(predominant_rank = names(sort(table(rank_grouped), decreasing = TRUE)[1])) %>% # Select the rank_grouped category with the highest count
+    summarize(median_closeness = median(Closeness, na.rm = TRUE)) %>%
     ungroup()
   
-  # Merge the predominant category back to the region data
-  region_data <- region_data %>%
-    left_join(predominant_category, by = "geo_id")
+  # Determine the "predominant_rank" based on the median Closeness value
+  df_median_closeness <- df_median_closeness %>%
+    mutate(predominant_rank = case_when(
+      median_closeness < cutoffs[1] ~ "Low",
+      median_closeness < cutoffs[2] ~ "Moderate Low",
+      median_closeness < cutoffs[3] ~ "Moderate",
+      median_closeness < cutoffs[4] ~ "Moderate High",
+      TRUE ~ "High"
+    ))
   
-  # Plot the boxplot
-  ggplot(region_data, aes(x = Closeness, y = reorder(geo_id, Closeness), fill = predominant_rank)) +
-    geom_boxplot(outlier.size = 1) +
-    theme_minimal() +
-    theme(axis.text.y = element_text(size = 9)) +  # Adjusting font size for y-axis labels
-    scale_fill_manual(values = vulnerability_colors, 
-                      limits = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High")) +  # Ensure correct legend order
-    labs(title = paste("Region: ", region_name), y = "Geo ID", x = "Closeness", fill = "Predominant Category") +
-    guides(fill = guide_legend(title = "Vulnerability Category")) +
-    # Add vertical lines at the percentile cutoffs
-    geom_vline(xintercept = cutoffs, color = "#ff5353", linetype = "dashed", linewidth = 1.2) +
-    theme(plot.title = element_text(hjust = 0.5))
+  # Rank the Closeness values across the entire dataset
+  ranked_region_data <- res_melt %>%
+    group_by(Iteration) %>%
+    mutate(ranked_closeness = rank(Closeness, ties.method = "average")) %>%
+    ungroup() %>%
+    filter(county_name %in% region_counties)
+  
+  # Merge the median closeness and "predominant_rank" back into the region data
+  ranked_region_data <- ranked_region_data %>%
+    left_join(df_median_closeness, by = "geo_id")
+  
+  ranked_region_data$predominant_rank <- factor(ranked_region_data$predominant_rank,
+                                                levels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"))
+  
+  # Create a composite factor for ordering by category and then by median Closeness within each category
+  ranked_region_data <- ranked_region_data %>%
+    arrange(predominant_rank, desc(median_closeness)) %>%
+    mutate(geo_id_ordered = factor(geo_id, levels = unique(geo_id)))
+  
+  # create fake data just to get the category labels + colors to appear in legend
+  dummy_data <- data.frame(
+    Closeness = c(-1000, -1000, -1000, -1000, -1000),
+    geo_id = as.character(rep(sample(unique(region_data$geo_id), 1), 5)),
+    predominant_rank = factor(c("Low", "Moderate Low", "Moderate", "Moderate High", "High"),
+                              levels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"))
+  )
+
+#  print(head(ranked_region_data))
+  
+  # region_data <- region_data %>%
+  #   arrange(predominant_rank, median_closeness) %>%
+  #   mutate(geo_id_ordered = factor(geo_id, levels = unique(geo_id)))
+
+  # closeness_range <- range(region_data$Closeness, na.rm = TRUE)
+  
+  rank_cutoffs <- quantile(1:nrow(data_norm), probs = c(0.2, 0.4, 0.6, 0.8))
+  rank_range <- range(1, nrow(data_norm))
+  
+  
+#   ggplot(region_data, aes(x = Closeness, y = reorder(geo_id, Closeness, FUN = median), fill = predominant_rank)) +
+#     geom_boxplot(outlier.size = 1) +
+#     geom_boxplot(data = dummy_data, aes(x = Closeness, y = geo_id, fill = predominant_rank)) +  # Use geom_blank to ensure all levels are included in the legend
+#     theme_minimal() +
+#     theme(axis.text.y = element_text(size = 9)) +
+#     
+#     scale_fill_manual(values = vulnerability_colors, 
+#                       limits = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"),
+#                       drop = FALSE) +  # Include all levels in the legend, even if not present in the data
+#     scale_x_continuous(breaks = cutoffs, labels = round(cutoffs, 2)) + 
+#     labs(title = paste("Region: ", region_name), 
+#          y = "Geo ID\n", 
+#          x = "\nTOPSIS Weighted Vulnerability Score", 
+#          fill = "Predominant Category") +
+#     guides(fill = guide_legend(title = "Vulnerability Category")) +
+#     geom_vline(xintercept = cutoffs, color = "#ff5353", linetype = "dashed", linewidth = 1.2) +
+#     coord_cartesian(xlim = closeness_range) +  # Set limits to the range of actual data
+#     theme(plot.title = element_text(hjust = 0.5))
+# }
+
+    ggplot(ranked_region_data, aes(x = ranked_closeness, y = reorder(geo_id, ranked_closeness, FUN = median), fill = predominant_rank)) +
+      geom_boxplot(outlier.size = 1) +
+      geom_boxplot(data = dummy_data, aes(x = Closeness, y = geo_id, fill = predominant_rank)) +  # Use geom_blank to ensure all levels are included in the legend
+      theme_minimal() +
+      theme(axis.text.y = element_text(size = 9)) +  # Adjusting font size for y-axis labels
+      scale_fill_manual(values = vulnerability_colors, 
+                        limits = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"),
+                        drop = FALSE) +  # Include all levels in the legend, even if not present in the data
+      scale_x_continuous() +  # Automatically adjust x-axis to fit rank values
+      labs(title = paste("Region: ", region_name), 
+           y = "Geo ID\n", 
+           x = "\nOverall Ranking", 
+           fill = "Predominant Category") +
+      guides(fill = guide_legend(title = "Vulnerability Category")) +
+      geom_vline(xintercept = rank_cutoffs, color = "#ff5353", linetype = "dashed", linewidth = 1.2) +
+      coord_cartesian(xlim = rank_range) +  # Set limits to the range of actual data
+      theme(plot.title = element_text(hjust = 0.5))
 }
+
 
 plot_climate_region("Western", climate_regions$Western)
 plot_climate_region("Southeastern", climate_regions$Southeastern)
@@ -326,6 +320,26 @@ plot_climate_region("North_Central", climate_regions$North_Central)
 plot_climate_region("South_Central", climate_regions$South_Central)
 plot_climate_region("Central", climate_regions$Central)
 
-# write.csv(res_melt, "data/df_topsis.csv", row.names = FALSE)
+#write.csv(res_melt, "data/df_topsis.csv", row.names = FALSE)
 write.csv(res_melt, "data/df_topsis_weighted.csv", row.names = FALSE)
+
+
+# save plots
+save_all_plots <- function() {
+  # Loop over each region and save the plot
+  for (region_name in names(climate_regions)) {
+    plot <- plot_climate_region(region_name, climate_regions[[region_name]])
+    plot <- plot + theme(rect = element_rect(fill = "transparent"))
+    
+    filename <- paste0("outputs/plot_topsis_weighted_", tolower(region_name), ".png")
+    ggsave(
+      plot = plot,
+      filename = filename,
+      bg = "transparent"
+    )
+  }
+}
+
+# Call the function to save all plots
+save_all_plots()
 
