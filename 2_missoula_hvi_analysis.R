@@ -6,6 +6,9 @@ library(tidyr)
 library(ggplot2)
 library(gridExtra)
 library(glue)
+library(Hmisc)
+library(naniar)
+library(visdat)
 options(scipen = 999)
 
 # setup
@@ -141,7 +144,7 @@ df_full <- df_full %>%
 # create the impervious-to-canopy ratio variable
 # The index was multiplied by -1 so that higher values correspond to more impervious coverage area and
 # therefore a greater risk of an urban heat island. 
-# This was the previous R packages approach; replacing it now with the index derived in python from that approach.
+# This was the previous R packages approach; replacing it now with the index derived in python.
 # df_full <- df_full %>%
 #   mutate(impervious_canopy_index = 
 #            -1 * ((canopy_perc_mean * area_sq_miles) - (imperviousness_perc_mean * area_sq_miles)) /
@@ -150,9 +153,6 @@ df_full <- df_full %>%
 
 
 # missingness
-library(naniar)
-library(visdat)
-
 vis_miss(df_full)
 
 df_full %>%
@@ -264,22 +264,56 @@ for_ranking <- df_final %>%
   select(-ends_with("_z"), 
          -starts_with("z_"))
 
-# Add ranked columns for each variable in for_ranking
+rank_by_quantile <- function(x, probs = c(0.2, 0.4, 0.6, 0.8)) {
+  # Calculate quantile breaks
+  breaks <- quantile(x, probs = c(0, probs, 1), na.rm = TRUE, type = 7) # type 7 is the default quantile algorithm
+  
+  breaks <- unique(breaks)
+  ranked_values <- cut(x, breaks = breaks, include.lowest = TRUE, labels = FALSE)
+  
+  # Check the range of ranks to ensure it's 1 to 5
+  if (length(unique(ranked_values)) > 5) {
+    warning("More than 5 ranks detected; please check the quantile calculation.")
+  }
+  return(ranked_values)
+}
+
+# Apply the quantile ranking function across the selected columns
 df_final <- df_final %>%
-  mutate(across(all_of(names(for_ranking)), ~ntile(., 5), .names = "{.col}_ranked"),
-         hvi_index_category = case_when(
-           hvi_index_ranked == 1 ~ "Low",
-           hvi_index_ranked == 2 ~ "Moderate_Low",
-           hvi_index_ranked == 3 ~ "Moderate",
-           hvi_index_ranked == 4 ~ "Moderate_High",
-           hvi_index_ranked == 5 ~ "High",
-           TRUE ~ NA_character_))
+  mutate(across(all_of(names(for_ranking)), 
+                ~ rank_by_quantile(.),  # Apply the custom quantile ranking function
+                .names = "{.col}_ranked"))
+
+df_final <- df_final %>%
+  mutate(hvi_index_category = case_when(
+    hvi_index_ranked == 1 ~ "Low",
+    hvi_index_ranked == 2 ~ "Moderate_Low",
+    hvi_index_ranked == 3 ~ "Moderate",
+    hvi_index_ranked == 4 ~ "Moderate_High",
+    hvi_index_ranked == 5 ~ "High",
+    TRUE ~ NA_character_))
 
 # QA / explore the results a bit
-ggplot(df_final, aes(x = hvi_index)) +
-  geom_histogram(binwidth = .05, color = "black") +
+vulnerability_colors <- c(
+  "Low" = "#99d8c9",            # Light blue
+  "Moderate_Low" = "#c9e2f5",   # Light purple
+  "Moderate" = "#fdd49e",       # Light orange
+  "Moderate_High" = "#fb8726",  # Medium orange
+  "High" = "#a60000"            # Red
+)
+
+ggplot(df_final, aes(x = hvi_index, fill = hvi_index_category)) +
+  geom_histogram(binwidth = 0.05, color = "black") +
+  scale_fill_manual(values = vulnerability_colors) +
   theme_minimal() +
-  labs(title = "Distribution of HVI Index Values", x = "HVI Index", y = "Count")
+  labs(title = "Distribution of HVI Index Values",
+       x = "HVI Index",
+       y = "Count",
+       fill = "Vulnerability Category") +
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+df_final %>% 
+  count(hvi_index_category)
 
 # rename variables so I don't have to do it manually in ArcGIS
 new_names <- c(

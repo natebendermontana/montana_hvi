@@ -17,6 +17,10 @@ vulnerability_colors <- c(
   "High" = "#a60000"            # Red
 )
 
+replace_underscores <- function(category) {
+  return(gsub("_", " ", category))
+}
+
 df_equal_weight_full <- df_equal_weight_full %>%
   rename(HVI_equal_weight_cat = HVI.Category,
          geo_id = GEOID) %>% 
@@ -25,13 +29,14 @@ df_equal_weight_full <- df_equal_weight_full %>%
 
 # Ensure df_equal_weight has unique geo_id and the proper column
 df_equal_weight <- df_equal_weight_full %>% 
-  mutate(HVI_equal_weight_cat = factor(HVI_equal_weight_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))) %>%
+  #mutate(HVI_equal_weight_cat = factor(HVI_equal_weight_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))) %>%
+  mutate(HVI_equal_weight_cat = replace_underscores(HVI_equal_weight_cat)) %>% 
   distinct(geo_id, .keep_all = TRUE)
 
 # Ensure df_topsis has unique geo_id and calculate predominant category for each unique geo_id
 df_topsis <- df_topsis_full %>%
-  rename(HVI_topsis_cat = rank_grouped) %>%
-  mutate(HVI_topsis_cat = factor(HVI_topsis_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))) %>%
+  rename(HVI_topsis_cat = predominant_rank) %>%
+  mutate(HVI_topsis_cat = factor(HVI_topsis_cat, levels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"))) %>%
   group_by(geo_id) %>%
   summarize(predominant_cat = names(sort(table(HVI_topsis_cat), decreasing = TRUE)[1])) %>%
   ungroup()
@@ -48,8 +53,8 @@ agreement_perc <- mean(comparison_df$agreement) * 100
 
 # Scatterplot of categories
 unweight_cat_chart <- ggplot(comparison_df, aes(
-  x = factor(predominant_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High")),
-  y = factor(HVI_equal_weight_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))
+  x = factor(predominant_cat, levels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High")),
+  y = factor(HVI_equal_weight_cat, levels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"))
 )) +
   geom_jitter(aes(color = agreement), width = 0.2, height = 0.2) +
   scale_color_manual(values = c("TRUE" = "#66c2a5", "FALSE" = "#fc8d62")) +
@@ -106,8 +111,8 @@ write.csv(comparison_percentiles, "data/df_methodology_comparison.csv", row.name
 ######################################################
 ######################################################
 df_topsis_weights <- df_topsis_weights_full %>%
-  rename(HVI_topsis_cat = rank_grouped) %>%
-  mutate(HVI_topsis_cat = factor(HVI_topsis_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))) %>%
+  rename(HVI_topsis_cat = predominant_rank) %>%
+  mutate(HVI_topsis_cat = factor(HVI_topsis_cat, levels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"))) %>%
   group_by(geo_id) %>%
   summarize(predominant_cat = names(sort(table(HVI_topsis_cat), decreasing = TRUE)[1])) %>%
   ungroup()
@@ -124,8 +129,8 @@ comparison_df_weights <- comparison_df_weights %>%
 agreement_perc <- mean(comparison_df_weights$agreement) * 100
 
 weight_cat_chart <- ggplot(comparison_df_weights, aes(
-  x = factor(predominant_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High")),
-  y = factor(HVI_equal_weight_cat, levels = c("Low", "Moderate_Low", "Moderate", "Moderate_High", "High"))
+  x = factor(predominant_cat, levels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High")),
+  y = factor(HVI_equal_weight_cat, levels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"))
 )) +
   geom_jitter(aes(color = agreement), width = 0.2, height = 0.2) +
   scale_color_manual(values = c("TRUE" = "#66c2a5", "FALSE" = "#fc8d62")) +
