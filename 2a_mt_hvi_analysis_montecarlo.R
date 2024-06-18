@@ -92,6 +92,28 @@ df_full_complete <- df_full %>%
   filter(complete.cases(.))
 
 n <- 10000
+plot_range <- range(0,1)
+
+climate_regions <- list(
+  Western_north = c("Lincoln", "Flathead", "Sanders", "Lake", "Mineral"),
+  Western_south = c("Missoula", "Ravalli", "Granite", "Deer Lodge", "Powell"),
+  Southwestern = c("Beaverhead", "Madison", "Silver Bow", "Jefferson", "Gallatin"),
+  North_Central = c("Glacier", "Toole", "Liberty", "Hill", "Blaine", "Chouteau", "Pondera", "Teton"),
+  Central = c("Cascade", "Lewis and Clark", "Broadwater", "Meagher", "Judith Basin", "Fergus"),
+  South_Central = c("Park", "Sweet Grass", "Stillwater", "Carbon", "Yellowstone"),
+  Northeastern = c("Daniels", "Sheridan", "Roosevelt", "Valley", "Phillips"),
+  Southeastern = c("Garfield", "McCone", "Richland", "Dawson", "Wibaux", "Fallon", 
+                   "Prairie", "Carter", "Powder River", "Custer", "Rosebud", 
+                   "Treasure", "Musselshell", "Golden Valley", "Petroleum")
+)
+
+vulnerability_colors <- c(
+  "Low" = "#99d8c9",            # Light blue
+  "Moderate Low" = "#c9e2f5",   # Light purple
+  "Moderate" = "#fdd49e",       # Light orange
+  "Moderate High" = "#fb8726",  # Medium orange
+  "High" = "#a60000"            # Red
+)
 
 # *******************************************************
 # *******************************************************
@@ -173,18 +195,6 @@ df_median_closeness <- res_melt %>%
 # Ranking - percentile-based cutoffs
 cutoffs <- quantile(res_melt$Closeness, probs = c(0.2, 0.4, 0.6, 0.8))
 
-# res_melt$rank_grouped <- NA  # Initialize with NA (Not Available)
-# res_melt$rank_grouped[res_melt$Closeness >= cutoffs[4]] <- 5
-# res_melt$rank_grouped[res_melt$Closeness < cutoffs[4] & res_melt$Closeness >= cutoffs[3]] <- 4
-# res_melt$rank_grouped[res_melt$Closeness < cutoffs[3] & res_melt$Closeness >= cutoffs[2]] <- 3
-# res_melt$rank_grouped[res_melt$Closeness < cutoffs[2] & res_melt$Closeness >= cutoffs[1]] <- 2
-# res_melt$rank_grouped[res_melt$Closeness < cutoffs[1]] <- 1
-# 
-# # Convert numerical categories to descriptive names using the factor function
-# res_melt$rank_grouped <- factor(res_melt$rank_grouped, 
-#                                 levels = 1:5, 
-#                                 labels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"))
-
 # Determine the "predominant_rank" based on the median Closeness value for each geo_id
 df_median_closeness <- df_median_closeness %>%
   mutate(predominant_rank = case_when(
@@ -202,38 +212,12 @@ res_melt <- res_melt %>%
 res_melt %>% 
   count(predominant_rank)
 
-
-climate_regions <- list(
-  Western_north = c("Lincoln", "Flathead", "Sanders", "Lake", "Mineral"),
-  Western_south = c("Missoula", "Ravalli", "Granite", "Deer Lodge", "Powell"),
-  Southwestern = c("Beaverhead", "Madison", "Silver Bow", "Jefferson", "Gallatin"),
-  North_Central = c("Glacier", "Toole", "Liberty", "Hill", "Blaine", "Chouteau", "Pondera", "Teton"),
-  Central = c("Cascade", "Lewis and Clark", "Broadwater", "Meagher", "Judith Basin", "Fergus"),
-  South_Central = c("Park", "Sweet Grass", "Stillwater", "Carbon", "Yellowstone"),
-  Northeastern = c("Daniels", "Sheridan", "Roosevelt", "Valley", "Phillips"),
-  Southeastern = c("Garfield", "McCone", "Richland", "Dawson", "Wibaux", "Fallon", 
-                   "Prairie", "Carter", "Powder River", "Custer", "Rosebud", 
-                   "Treasure", "Musselshell", "Golden Valley", "Petroleum")
-)
-
-vulnerability_colors <- c(
-  "Low" = "#99d8c9",            # Light blue
-  "Moderate Low" = "#c9e2f5",   # Light purple
-  "Moderate" = "#fdd49e",       # Light orange
-  "Moderate High" = "#fb8726",  # Medium orange
-  "High" = "#a60000"            # Red
-)
-
 vulnerability_colors <- rev(brewer.pal(5, "RdYlGn"))
 vulnerability_colors <- setNames(vulnerability_colors, levels(res_melt$rank_grouped))
 
 plot_range <- range(0,1)
 
 plot_climate_region <- function(region_name, region_counties) {
-  # region_data <- res_melt %>%
-  #   filter(county_name %in% region_counties)
-
-  # Rank the Closeness values across the entire dataset
   region_data <- res_melt %>%
     filter(county_name %in% region_counties)
 
@@ -247,12 +231,14 @@ plot_climate_region <- function(region_name, region_counties) {
   
   counties_subtitle <- paste(region_counties, collapse = ", ")
   
-  # y = reorder(geo_id, rank_closeness, FUN=median)
-  ggplot(region_data, aes(x = Closeness, y = reorder(geo_id, Closeness, FUN=median), fill = predominant_rank)) +
+  # y = reorder(geo_id, Closeness, FUN=median)
+  ggplot(region_data, aes(x = Closeness, y = reorder(geo_id, median_closeness), fill = predominant_rank)) +
     geom_boxplot(outlier.size = 1) +
     geom_boxplot(data = dummy_data, aes(x = Closeness, y = geo_id, fill = predominant_rank)) +  # Use geom_blank to ensure all levels are included in the legend
     theme_minimal() +
-    theme(axis.text.y = element_text(size = 9)) +  # Adjusting font size for y-axis labels
+    theme(axis.text.y = element_text(size = 9),
+          legend.title = element_text(size = 14),  # Increase legend title size
+          legend.text = element_text(size = 12)) + # Increase legend text size) +  # Adjusting font size for y-axis labels
     scale_fill_manual(values = vulnerability_colors, 
                       limits = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"),
                       drop = FALSE) +  # Include all levels in the legend, even if not present in the data
@@ -287,7 +273,7 @@ save_all_plots <- function() {
     plot <- plot_climate_region(region_name, climate_regions[[region_name]])
     plot <- plot + theme(rect = element_rect(fill = "transparent"))
     
-    filename <- paste0("outputs/plot_topsis_weighted_", tolower(region_name), ".png")
+    filename <- paste0("outputs/plot_topsis_unweighted_", tolower(region_name), ".png")
     ggsave(
       plot = plot,
       filename = filename,
@@ -297,18 +283,17 @@ save_all_plots <- function() {
 }
 
 # Call the function to save all plots
-# save_all_plots()
+save_all_plots()
 
 # Function to extract and save the ordering of geo_ids
 save_geo_id_ordering <- function(region_name, region_counties) {
   region_data <- res_melt %>%
     filter(county_name %in% region_counties)
   
-  # Get the ordered geo_ids based on the median Closeness value
   ordered_geo_ids <- region_data %>%
-    arrange(geo_id, median_closeness) %>%
-    pull(geo_id) %>%
-    unique()
+    arrange(median_closeness) %>%
+    distinct(geo_id) %>% 
+    pull(geo_id)
   
   return(ordered_geo_ids)
 }
@@ -352,7 +337,8 @@ data_norm <- as.data.frame(scale(data, center = FALSE, scale = sqrt(colSums(data
 
 fixed_weights <- c("surface_temp_mean" = 0.25, "mc_killer_heat_diff" = 0.25)
 remaining_weight <- 1 - sum(fixed_weights)
-crit <- rep("max", length(cols) - 3)  # Exclude the geo_id column. 
+crit <- rep("max", length(cols) - 1)  # Exclude the geo_id column. 
+res <- matrix(0, nrow = n, ncol = nrow(data_norm))
 
 set.seed(123061724) # For reproducibility
 for (i in 1:n) {
@@ -415,7 +401,6 @@ res_melt <- res_melt %>%
 res_melt %>% 
   count(predominant_rank)
 
-
 plot_with_saved_ordering <- function(region_name, region_counties) {
   region_data <- res_melt %>%
     filter(county_name %in% region_counties)
@@ -423,10 +408,20 @@ plot_with_saved_ordering <- function(region_name, region_counties) {
   ordered_geo_ids <- geo_id_ordering[[region_name]]
   region_data$geo_id <- factor(region_data$geo_id, levels = ordered_geo_ids)
   
+  dummy_data <- data.frame(
+    Closeness = c(-1000, -1000, -1000, -1000, -1000), # values far outside the visible plot area
+    geo_id = as.character(rep(sample(unique(region_data$geo_id), 1), 5)), #grab a random ID from current data
+    predominant_rank = factor(c("Low", "Moderate Low", "Moderate", "Moderate High", "High"),
+                              levels = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"))
+  )
+  
   ggplot(region_data, aes(x = Closeness, y = geo_id, fill = predominant_rank)) +
     geom_boxplot(outlier.size = 1) +
+    geom_boxplot(data = dummy_data, aes(x = Closeness, y = geo_id, fill = predominant_rank)) +  # Use geom_blank to ensure all levels are included in the legend
     theme_minimal() +
-    theme(axis.text.y = element_text(size = 9)) +
+    theme(axis.text.y = element_text(size = 9),
+          legend.title = element_text(size = 14),  # Increase legend title size
+          legend.text = element_text(size = 12)) + # Increase legend text size) +
     scale_fill_manual(values = vulnerability_colors, 
                       limits = c("Low", "Moderate Low", "Moderate", "Moderate High", "High"),
                       drop = FALSE) +
@@ -438,19 +433,25 @@ plot_with_saved_ordering <- function(region_name, region_counties) {
     guides(fill = guide_legend(title = "Vulnerability Category")) +
     geom_vline(xintercept = cutoffs, color = "#ff5353", linetype = "dashed", linewidth = 1.2) +
     coord_cartesian(xlim = plot_range) +
-    theme(plot.title = element_text(hjust = 0.5))
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))
 }
 
 plot_with_saved_ordering("Southeastern", climate_regions$Southeastern)
+plot_with_saved_ordering("Western (North Half)", climate_regions$Western_north)
+plot_with_saved_ordering("Western (South Half)", climate_regions$Western_south)
+plot_with_saved_ordering("Southwestern", climate_regions$Southwestern)
+plot_with_saved_ordering("Northeastern", climate_regions$Northeastern)
+plot_with_saved_ordering("North_Central", climate_regions$North_Central)
+plot_with_saved_ordering("South_Central", climate_regions$South_Central)
+plot_with_saved_ordering("Central", climate_regions$Central)
 
-
-# write.csv(res_melt, "data/df_topsis_weighted.csv", row.names = FALSE)
-
+write.csv(res_melt, "data/df_topsis_weighted.csv", row.names = FALSE)
 
 save_all_plots <- function() {
   # Loop over each region and save the plot
   for (region_name in names(climate_regions)) {
-    plot <- plot_climate_region(region_name, climate_regions[[region_name]])
+    plot <- plot_with_saved_ordering(region_name, climate_regions[[region_name]])
     plot <- plot + theme(rect = element_rect(fill = "transparent"))
     
     filename <- paste0("outputs/plot_topsis_weighted_", tolower(region_name), ".png")
@@ -463,5 +464,5 @@ save_all_plots <- function() {
 }
 
 # Call the function to save all plots
-# save_all_plots()
+save_all_plots()
 

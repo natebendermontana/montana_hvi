@@ -60,7 +60,7 @@ unweight_cat_chart <- ggplot(comparison_df, aes(
   scale_color_manual(values = c("TRUE" = "#66c2a5", "FALSE" = "#fc8d62")) +
   labs(title = "Scatter Plot of Vulnerability Category Comparison",
        x = "Unweighted TOPSIS Predominant Category",
-       y = "Equal Weight Category",
+       y = "NJ Equal Weight Category",
        color = "Agreement") +
   theme_minimal()
 
@@ -91,7 +91,7 @@ unweight_scatter_chart <- ggplot(comparison_percentiles, aes(x = closeness_perce
   scale_color_manual(values = vulnerability_colors) +
   labs(title = "Comparison of Percentile Ranks for Vulnerability Estimates",
        x = "Median Closeness Percentile (Unweighted TOPSIS Method)",
-       y = "HVI Percentile (Equal Weight Method)",
+       y = "HVI Percentile (NJ Equal Weight Method)",
        color = "HVI Percentile Category") +
   theme_minimal()
 
@@ -136,7 +136,7 @@ weight_cat_chart <- ggplot(comparison_df_weights, aes(
   scale_color_manual(values = c("TRUE" = "#66c2a5", "FALSE" = "#fc8d62")) +
   labs(title = "Scatter Plot of Vulnerability Category Comparison",
        x = "Weighted TOPSIS Predominant Category",
-       y = "Equal Weight Category",
+       y = "NJ Equal Weight Category",
        color = "Agreement") +
   theme_minimal()
 
@@ -168,7 +168,7 @@ weight_scatter_chart <- ggplot(comparison_weights_percentiles, aes(x = closeness
   #scale_color_gradient(low = "blue", high = "red") +
   labs(title = "Comparison of Percentile Ranks for Vulnerability Estimates",
        x = "Median Closeness Percentile (Weighted TOPSIS Method)",
-       y = "HVI Percentile (Equal Weight Method)",
+       y = "HVI Percentile (NJ Equal Weight Method)",
        color = "HVI Percentile") +
   theme_minimal()
 
